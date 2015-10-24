@@ -72,7 +72,7 @@
         .data(_.filter(nodes, function(node) {return node.type === 'api';}))
         .enter().append('text')
         .attr('dy', '.35em')
-        .attr('fill', '#555')
+        .attr('fill', '#666')
         .style({
           'font-size': '12px',
           'font-family': 'Helvetica',
@@ -237,7 +237,7 @@
       circle.transition().duration(brushing ? 0 : duration)
         .attr('fill-opacity', function(d) {
           if (d.selected || d.hovered) {
-            return d.type === 'api' ? .75 : 1;
+            return d.type === 'api' ? .5 : 1;
           } else if (_.isEmpty(selected) && !hovered) {
             return d.type === 'api' ? .25 : 1;
           } else {
@@ -274,7 +274,7 @@
       var colors = d3.scale.category20();
       var sizeScale = d3.scale.linear()
         .domain([_.min(api), _.max(api)])
-        .range([5, 40]);
+        .range([7.5, 50]);
       var widthScale = d3.scale.linear()
         .domain([_.min(linkStrengths), _.max(linkStrengths)])
         .range([1, 5]);
@@ -303,28 +303,36 @@
           node.y = radius * Math.sin(radian) + (height / 2);
           return node;
         }).compact().value();
-      var blockNodes = _.map(data, function(block) {
-        var node = {
-          id: block.id,
-          title: block.description,
-          user: block.userId,
-          image: block.thumbnail,
-          size: 5,
-          stroke: '#999'
-        };
-        _.each(block.api, function(count, apiName) {
-          if (!api[apiName]) return;
-          links.push({
-            source: node,
-            target: api[apiName],
-            size: widthScale(count),
-            strength: strengthScale(count)
+      var blockNodes = _.chain(data)
+        .filter(function(block) {
+          // only keep if it has API's and at least one of them are in apiNodes
+          return !_.isEmpty(block.api) && _.some(block.api, function(count, apiName) {
+            return api[apiName];
           });
-        });
+        }).uniq(function(block) {return block.id})
+        .map(function(block) {
+          var node = {
+            id: block.id,
+            title: block.description,
+            user: block.userId,
+            image: block.thumbnail,
+            size: 5,
+            stroke: '#777'
+          };
+          _.each(block.api, function(count, apiName) {
+            if (!api[apiName]) return;
+            links.push({
+              source: node,
+              target: api[apiName],
+              size: widthScale(count),
+              strength: strengthScale(count)
+            });
+          });
 
-        return node;
-      });
+          return node;
+        }).value();
       
+      console.log(blockNodes.length)
       nodes = _.union(apiNodes, blockNodes);
       force.nodes(nodes).links(links);
       
