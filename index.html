@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="utf-8">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/3.10.1/lodash.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+  <style>
+    body {      margin:0;position:absolute;top:0;right:0;bottom:0;left:0;
+        overflow-y: scroll;}
+    svg { width: 1024px; height: 1024px; }
+    .brush .extent {
+      fill: #555;
+      fill-opacity: .1;
+      stroke: #fff;
+      shape-rendering: crispEdges;
+    }
+  </style>
+</head>
+
+<body>
+  <script>
+    var margin = {top: 20, right: 10, bottom: 20, left: 10};
+    var width = 1024 - margin.left - margin.right;
+    var height = 1024 - margin.top - margin.bottom;
+    var duration = 200;
+    var radius = 400;
+    var apiSize = 60;
+    var ignoreApi = ['d3.select', 'd3.selectAll'];
+    var selected = {};
+    var hovered = false;
+    var brushing = false;
+    var force = d3.layout.force()
+      .size([width, height])
+      .charge(function(d) {return d.type === 'api' ? 5 : -Math.pow(d.size, 2)})
+      .linkStrength(function(d) {return d.strength})
+      .on('end', updateGraph);
+    var nodes = [],
+        links = [];
+  
+    var circle, path, text, summary;
+    var svg = d3.select("body").append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+    var div = d3.select('body').append('div')
+      .style({
+        'width': '1024px',
+        'text-align': 'center'
+      });
+    svg.append("g")
+      .attr("class", "brush")
+      .call(d3.svg.brush()
+        .x(d3.scale.identity().domain([0, width]))
+        .y(d3.scale.identity().domain([0, height]))
+        .on('brushstart', function() {brushing = true;})
+        .on("brush", brush)
+        .on('brushend', function() {brushing = false;}));
+    
+    function enterGraph() {
+      path = svg.selectAll('line')
+        .data(links).enter().insert('line', '.brush')
+        .attr('stroke', '#ccc')
+        .attr('stroke-linecap', 'round');
+      circle = svg.selectAll('circle')
+        .data(nodes).enter().append('circle')
+        .attr('stroke-width', 2)
+        .style({'cursor': 'pointer'})
+        .on('mouseover', hover)
+        .on('mouseleave', unhover)
+        .on('click', select);
+      text = svg.selectAll('text')
+        .data(_.filter(nodes, function(node) {return node.type === 'api';}))
+        .enter().append('text')
+        .attr('dy', '.35em')
+        .attr('fill', '#555')
+        .style({
+          'font-size': '12px',
+          'font-family': 'Helvetica',
+          'font-weight': 600,
+          'cursor': 'pointer'
+        }).on('mouseover', hover)
+        .on('mouseleave', unhover)
+        .on('click', select);
+    };
+    function updateGraph() { 
+      circle.attr('r', function(d) {return d.size})
+        .attr('fill', function(d) {return d.fill || '#fff'})
+        .attr('fill-opacity', function(d) {return d.type === 'api' ? .25 : 1})
+        .attr('stroke', function(d) {return d.stroke || 'none'})
+        .attr('cx', function(d) {return d.x})
+        .attr('cy', function(d) {return d.y});
+      text
+        .attr('text-anchor', function(d, i) {
+          return i < (apiSize / 2) ? 'start' : 'end';
+        }).attr('transform', function(d, i) {
+          var angle;
+          if (i < (apiSize / 2)) {
+            angle = (360 / apiSize) * i - 90;
+          } else {
+            angle = -(360 / apiSize) * (apiSize - i) + 90;
+          }
+          return 'translate(' + d.x + ',' + d.y +
+            ')rotate(' + angle + ')';
+        }).text(function(d) {return d.id});
+      
+      path.attr('stroke-width', function(d) {return d.size})
+        .attr('x1', function(d) {return d.source.x})
+        .attr('y1', function(d) {return d.source.y})
+        .attr('x2', function(d) {return d.target.x})
+        .attr('y2', function(d) {return d.target.y});
+    };
+    
+    function renderSummary() {
+      var selectedData = _.filter(selected, function(d) {return d.type !== 'api'});
+      summary = div.selectAll('span').data(selectedData);
+      
+      var enterSummary = summary.enter().append('span');
+      enterSummary.append('img');
+      enterSummary.append('a');
+      
+      summary.style({
+        'margin': '10px 5px',
+        'width': '300px',
+        'display': 'inline-block',
+        'vertical-align': 'top'
+      });
+      
+      summary.select('img')
+        .attr('src', function(d) {
+          return d.image
+        }).attr('width', 230)
+        .attr('height', 120)
+        .style({
+          'border': '1px solid #555',
+          'border-radius': '3px',
+          'margin': 5
+        });
+      
+      summary.select('a')
+        .attr('href', function(d) {
+          return 'http://bl.ocks.org/' + d.user + '/' + d.id;
+        }).attr('target', '_new')
+        .style({
+          'font-family': 'Garamond',
+          'display': 'block',
+          'color': '#555',
+          'width': '100%',
+          'text-align': 'center'
+        }).text(function(d) {return d.title + ' (' + d.user + ')';});
+      
+      summary.exit().remove();
+    };
+    
+    function hover() {
+      hovered = d3.select(this).datum();
+      calculateHighlight(hovered, true, 'hovered');
+      applyHighlight();
+      renderSummary();
+    }
+    
+    function unhover() {
+      hovered = false;
+      calculateHighlight(d3.select(this).datum(), false, 'hovered');
+      applyHighlight();
+      renderSummary();
+    }
+    
+    function select() {
+      var data = d3.select(this).datum();
+      if (selected[data.id]) {
+        delete selected[data.id];
+        calculateHighlight(data, false, 'selected');
+      } else {
+        selected[data.id] = data;
+        calculateHighlight(data, true, 'selected');
+      }
+      renderSummary();
+    }
+    
+    function brush() {
+      selected = {};
+      var extent = d3.event.target.extent();
+      circle.each(function(d) {
+        if (extent[0][0] <= d.x && d.x < extent[1][0]
+            && extent[0][1] <= d.y && d.y < extent[1][1]) {
+          selected[d.id] = d; 
+        }
+      });
+      
+      calculateHighlight(null, true, 'selected');
+      applyHighlight();
+      renderSummary();
+    }
+    
+    function calculateHighlight(data, highlight, type) {
+      var nodesToHighlight = {};
+
+      path.each(function(d) {
+        if ((data && d.source.id === data.id) || selected[d.source.id]) {
+          nodesToHighlight[d.target.id] = selected[d.source.id] ? true : highlight;
+          d[type] = selected[d.source.id] ? true : highlight;
+        } else if ((data && d.target.id === data.id) || selected[d.target.id]) {
+          nodesToHighlight[d.source.id] = selected[d.target.id] ? true : highlight;
+          d[type] = selected[d.target.id] ? true : highlight;
+        } else {
+          d[type] = false;
+        }
+      });
+
+      circle.each(function(d) {
+        if ((data && d.id === data.id) || selected[d.id]) {
+          d[type] = selected[d.id] ? true : highlight;
+        } else if (nodesToHighlight[d.id]) {
+          d[type] = nodesToHighlight[d.id];
+        } else {
+          d[type] = false;
+        }
+      });
+
+      text.each(function(d) {
+        if ((data && d.id === data.id) || selected[d.id]) {
+          d[type] = selected[d.id] ? true : highlight;
+        } else if (nodesToHighlight[d.id]) {
+          d[type] = nodesToHighlight[d.id];
+        } else {
+          d[type] = false;
+        }
+      });
+    }
+    
+    function applyHighlight() {
+      path.transition().duration(brushing ? 0 : duration)
+        .attr('stroke-opacity', function(d) {
+          return d.selected || d.hovered ||
+            (_.isEmpty(selected) && !hovered) ? 1 : .15;
+        });
+      circle.transition().duration(brushing ? 0 : duration)
+        .attr('fill-opacity', function(d) {
+          if (d.selected || d.hovered) {
+            return d.type === 'api' ? .75 : 1;
+          } else if (_.isEmpty(selected) && !hovered) {
+            return d.type === 'api' ? .25 : 1;
+          } else {
+            return .15;
+          }
+        }).attr('stroke-opacity', function(d) {
+          return d.selected || d.hovered ||
+            (_.isEmpty(selected) && !hovered) ? 1 : .15;
+        });
+      text.transition().duration(brushing ? 0 : duration)
+        .attr('fill-opacity', function(d) {
+          return d.selected || d.hovered ||
+            (_.isEmpty(selected) && !hovered) ? 1 : .15;
+        });
+    }
+
+    // load data
+    d3.json('data.json', function(data) {
+      var linkStrengths = [];
+      var api = _.chain(data)
+        .pluck('api')
+        .map(function(api) {return _.pairs(api)})
+        .flatten().compact()
+        .filter(function(api) {return !_.contains(ignoreApi, api[0])})
+        .reduce(function(memo, api) {
+          linkStrengths.push(api[1]);
+          if (!memo[api[0]]) {
+            memo[api[0]] = 0;
+          }
+          memo[api[0]] += api[1];
+          return memo;
+        }, {})
+        .value();
+      var colors = d3.scale.category20();
+      var sizeScale = d3.scale.linear()
+        .domain([_.min(api), _.max(api)])
+        .range([5, 40]);
+      var widthScale = d3.scale.linear()
+        .domain([_.min(linkStrengths), _.max(linkStrengths)])
+        .range([1, 5]);
+      var strengthScale = d3.scale.linear()
+        .domain([_.min(linkStrengths), _.max(linkStrengths)])
+        .range([0, 1]);
+      var apiNodes = _.chain(api)
+        .map(function(count, name) {
+          api[name] = {
+            id: name,
+            size: sizeScale(count),
+            fill: colors(name),
+            fixed: true,
+            type: 'api'
+          };
+          return api[name];
+        }).sortBy(function(node) {
+          return -node.size;  
+        }).map(function(node, i) {
+          if (i > (apiSize - 1)) {
+            delete api[node.id];
+            return; 
+          }
+          var radian = (2 * Math.PI) / apiSize * i - (Math.PI / 2);
+          node.x = radius * Math.cos(radian) + (width / 2);
+          node.y = radius * Math.sin(radian) + (height / 2);
+          return node;
+        }).compact().value();
+      var blockNodes = _.map(data, function(block) {
+        var node = {
+          id: block.id,
+          title: block.description,
+          user: block.userId,
+          image: block.thumbnail,
+          size: 5,
+          stroke: '#999'
+        };
+        _.each(block.api, function(count, apiName) {
+          if (!api[apiName]) return;
+          links.push({
+            source: node,
+            target: api[apiName],
+            size: widthScale(count),
+            strength: strengthScale(count)
+          });
+        });
+
+        return node;
+      });
+      
+      nodes = _.union(apiNodes, blockNodes);
+      force.nodes(nodes).links(links);
+      
+      enterGraph();
+      
+      force.start();
+      _.times(1000, function() {force.tick();});
+      force.stop();
+    });
+  </script>
+</body>
