@@ -21,7 +21,7 @@
     var margin = {top: 20, right: 10, bottom: 20, left: 10};
     var width = 800 - margin.left - margin.right;
     var height = 800 - margin.top - margin.bottom;
-    var duration = 200;
+    var duration = 100;
     var radius = 250;
     var apiSize = 50;
     var ignoreApi = ['d3.select', 'd3.selectAll'];
@@ -61,6 +61,8 @@
         .attr('stroke-linecap', 'round');
       circle = svg.selectAll('circle')
         .data(nodes).enter().append('circle')
+        .attr('stroke', 'none')
+        .attr('stroke-width', 3)
         .style({'cursor': 'pointer'})
         .on('mouseover', hover)
         .on('mouseleave', unhover)
@@ -197,40 +199,56 @@
       var nodesToHighlight = {};
 
       path.each(function(d) {
-        if ((data && d.source.id === data.id) || selected[d.source.id]) {
-          nodesToHighlight[d.target.id] = selected[d.source.id] ? true : highlight;
-          d[type] = selected[d.source.id] ? true : highlight;
-        } else if ((data && d.target.id === data.id) || selected[d.target.id]) {
-          nodesToHighlight[d.source.id] = selected[d.target.id] ? true : highlight;
-          d[type] = selected[d.target.id] ? true : highlight;
-        } else {
-          d[type] = false;
+        d.selected = false;
+        d.hovered = false;
+        if (selected[d.source.id]) {
+          // if it's highlighted because it's been previously selected
+          if (nodesToHighlight[d.target.id] !== 'hovered') {
+            nodesToHighlight[d.target.id] = 'selected';
+          }
+          d.selected = true;
+        } else if (selected[d.target.id]) {
+          if (nodesToHighlight[d.source.id] !== 'hovered') {
+            nodesToHighlight[d.source.id] = 'selected';
+          }
+          d.selected = true;
+        }
+        if (highlight && data && d.source.id === data.id) {
+          // if path is the one being hovered or selected
+          if (nodesToHighlight[d.target.id] !== 'hovered') {
+            nodesToHighlight[d.target.id] = type; 
+          }
+          d[type] = true;
+        }  else if (highlight && data && d.target.id === data.id) {
+          if (nodesToHighlight[d.source.id] !== 'hovered') {
+            nodesToHighlight[d.source.id] = type;
+          }
+          d[type] = true;
         }
       });
 
-      circle.each(function(d) {
-        if ((data && d.id === data.id) || selected[d.id]) {
-          d[type] = selected[d.id] ? true : highlight;
-        } else if (nodesToHighlight[d.id]) {
-          d[type] = nodesToHighlight[d.id];
-        } else {
-          d[type] = false;
+      d3.selectAll('circle,text').each(function(d) {
+        d.selected = false;
+        d.hovered = false;
+        if (selected[d.id]) {
+          // if previously selected
+          d.selected = true;
         }
-      });
-
-      text.each(function(d) {
-        if ((data && d.id === data.id) || selected[d.id]) {
-          d[type] = selected[d.id] ? true : highlight;
-        } else if (nodesToHighlight[d.id]) {
-          d[type] = nodesToHighlight[d.id];
-        } else {
-          d[type] = false;
+        if (nodesToHighlight[d.id]) {
+          // if on other side of a node being hovered or selected
+          d[nodesToHighlight[d.id]] = true;
+        }
+        if (highlight && data && d.id === data.id) {
+          // if circle is being hovered or selected
+          d[type] = true;
         }
       });
     }
     
     function applyHighlight() {
-      path.transition().duration(brushing ? 0 : duration)
+      path.attr('stroke', function(d) {
+          return d.hovered ? '#FFD84B' : '#ccc';
+        }).transition().duration(brushing ? 0 : duration)
         .attr('stroke-opacity', function(d) {
           if (d.selected || d.hovered) {
             return 1;
@@ -240,7 +258,9 @@
             return .15;
           }
         });
-      circle.transition().duration(brushing ? 0 : duration)
+      circle.attr('stroke', function(d) {
+          return d.hovered ? '#FFD84B' : 'none';
+        }).transition().duration(brushing ? 0 : duration)
         .attr('fill-opacity', function(d) {
           if (d.selected || d.hovered) {
             return d.type === 'api' ? .5 : 1;
@@ -249,9 +269,6 @@
           } else {
             return .15;
           }
-        }).attr('stroke-opacity', function(d) {
-          return d.selected || d.hovered ||
-            (_.isEmpty(selected) && !hovered) ? 1 : .15;
         });
       text.transition().duration(brushing ? 0 : duration)
         .attr('fill-opacity', function(d) {
