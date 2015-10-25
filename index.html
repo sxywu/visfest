@@ -84,6 +84,7 @@
         .attr('stroke-linecap', 'round');
       circle = svg.selectAll('circle')
         .data(nodes).enter().append('circle')
+        .classed('node', true)
         .attr('stroke', 'none')
         .attr('stroke-width', 3)
         .style({'cursor': 'pointer'})
@@ -93,6 +94,7 @@
       text = svg.selectAll('text')
         .data(_.filter(nodes, function(node) {return node.type === 'api';}))
         .enter().append('text')
+        .classed('nodeText', true)
         .attr('dy', '.35em')
         .attr('fill', '#666')
         .style({
@@ -139,18 +141,31 @@
         .value();
       summary = summaries.selectAll('g').data(selectedData);
       
-      var enterSummary = summary.enter().append('g');
+      var enterSummary = summary.enter().append('g')
+        .classed('summary', true);
+      enterSummary.append('rect');
       enterSummary.append('text')
         .classed('title', true);
       enterSummary.append('image');
       enterSummary.append('text')
         .classed('username', true);
 
-      var padding = 5;
+      var padding = 7.5;
       var textHeight = 12;
+      var imageWidth = 230;
       var imageHeight = 120;
+      var summaryWidth = 300;
+      var summaryHeight = (imageHeight + 8 * padding + textHeight);
+      summary.select('rect')
+        .attr('width', imageWidth + 2 * padding)
+        .attr('height', imageHeight + 4 * padding + 2 * textHeight)
+        .attr('rx', 3).attr('ry', 3)
+        .attr('fill', '#fcfcfc')
+        .attr('stroke-width', 3);
+
       summary.select('.title')
         .attr('dy', '.35em')
+        .attr('transform', 'translate(' + padding + ',' + (padding + textHeight / 2) + ')')
         .style({
           'font-weight': 600,
           'font-family': 'Helvetica',
@@ -166,14 +181,14 @@
       summary.select('image')
         .attr('xlink:href', function(d) {
           return d.image
-        }).attr('width', 230)
+        }).attr('width', imageWidth)
         .attr('height', imageHeight)
-        .attr('transform', 'translate(0,' + textHeight + ')');
+        .attr('transform', 'translate(' + padding + ',' + (textHeight + 2 * padding) + ')');
 
       summary.select('.username')
         .attr('dy', '.35em')
-        .attr('transform', 'translate(0,' +
-          (2 * padding + textHeight + imageHeight) + ')')
+        .attr('transform', 'translate(' + padding + ',' +
+          (4 * padding + textHeight + imageHeight) + ')')
         .style({
           'font-family': 'Helvetica',
           'font-size': textHeight
@@ -181,11 +196,15 @@
 
       var heightSize = Math.floor(2 * radius / (imageHeight + 4 * padding));
       summary.attr('transform', function(d, i) {
-        var x = 300 * (Math.floor(i / heightSize));
-        var y = (imageHeight + 12 * padding + textHeight) * (i % heightSize) +
-          ((height / 2) - radius);
+        var x = summaryWidth * (Math.floor(i / heightSize));
+        var y = summaryHeight * (i % heightSize) + ((height / 2) - radius);
         return 'translate(' + x + ',' + y + ')';
-      });
+      }).style({
+        'cursor': 'pointer'
+      }).on('click', function(d) {
+        window.open('http://bl.ocks.org/' + d.user + '/' + d.id, '_blank');
+      }).on('mouseover', hover)
+      .on('mouseleave', unhover);
       
       summary.exit().remove();
     };
@@ -280,7 +299,7 @@
         }
       });
 
-      d3.selectAll('circle,text').each(function(d) {
+      d3.selectAll('.node,.nodeText,.summary').each(function(d) {
         d.selected = false;
         d.hovered = false;
         if (selected[d.id]) {
@@ -327,6 +346,10 @@
         .attr('fill-opacity', function(d) {
           return d.selected || d.hovered ||
             (_.isEmpty(selected) && !hovered) ? 1 : .15;
+        });
+      summary && summary.select('rect')
+        .attr('stroke', function(d) {
+          return d.hovered ? '#FFD84B' : 'none';
         });
     }
 
