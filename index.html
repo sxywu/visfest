@@ -4,9 +4,16 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/3.10.1/lodash.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
   <style>
-    body {      margin:0;position:absolute;top:0;right:0;bottom:0;left:0;
-        overflow-y: scroll;}
-    svg { width: 1024px; height: 1024px; }
+    body {
+      margin:0;
+      position:absolute;
+      top:0;right:0;bottom:0;left:0;
+      overflow-y: scroll;
+    }
+    svg {
+      width: 100%;
+      height: 100%;
+    }
     .brush .extent {
       fill: #555;
       fill-opacity: .1;
@@ -40,11 +47,9 @@
     var svg = d3.select("body").append("svg")
       .append("g")
         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-    var div = d3.select('body').append('div')
-      .style({
-        'width': '1024px',
-        'text-align': 'center'
-      });
+    var summaries = d3.select('svg').append('g')
+      .attr('transform', 'translate(' +
+        (width + margin.left + margin.right) + ',' + ((height / 2) - radius) + ')');
     svg.append("g")
       .attr("class", "brush")
       .call(d3.svg.brush()
@@ -110,42 +115,58 @@
     };
     
     function renderSummary() {
-      var selectedData = _.filter(selected, function(d) {return d.type !== 'api'});
-      summary = div.selectAll('span').data(selectedData);
+      var selectedData = _.chain(selected)
+        .filter(function(d) {return d.type !== 'api'})
+        .sortBy(function(d) {return d.image})
+        .value();
+      summary = summaries.selectAll('g').data(selectedData);
       
-      var enterSummary = summary.enter().append('span');
-      enterSummary.append('img');
-      enterSummary.append('a');
-      
-      summary.style({
-        'margin': '10px 5px',
-        'width': '300px',
-        'display': 'inline-block',
-        'vertical-align': 'top'
-      });
-      
-      summary.select('img')
-        .attr('src', function(d) {
-          return d.image
-        }).attr('width', 230)
-        .attr('height', 120)
+      var enterSummary = summary.enter().append('g');
+      enterSummary.append('text')
+        .classed('title', true);
+      enterSummary.append('image');
+      enterSummary.append('text')
+        .classed('username', true);
+
+      var padding = 5;
+      var textHeight = 12;
+      var imageHeight = 120;
+      summary.select('.title')
+        .attr('dy', '.35em')
         .style({
-          'border': '1px solid #555',
-          'border-radius': '3px',
-          'margin': 5
+          'font-weight': 600,
+          'font-family': 'Helvetica',
+          'font-size': textHeight
+        }).text(function(d) {
+          var title = d.title;
+          if (title && title.length > 30) {
+            title = title.substring(0, 30) + ' ...';
+          }
+          return title;
         });
       
-      summary.select('a')
-        .attr('href', function(d) {
-          return 'http://bl.ocks.org/' + d.user + '/' + d.id;
-        }).attr('target', '_new')
+      summary.select('image')
+        .attr('xlink:href', function(d) {
+          return d.image
+        }).attr('width', 230)
+        .attr('height', imageHeight)
+        .attr('transform', 'translate(0,' + textHeight + ')');
+
+      summary.select('.username')
+        .attr('dy', '.35em')
+        .attr('transform', 'translate(0,' +
+          (2 * padding + textHeight + imageHeight) + ')')
         .style({
-          'font-family': 'Garamond',
-          'display': 'block',
-          'color': '#555',
-          'width': '100%',
-          'text-align': 'center'
-        }).text(function(d) {return d.title + ' (' + d.user + ')';});
+          'font-family': 'Helvetica',
+          'font-size': textHeight
+        }).text(function(d) {return d.user});
+
+      var heightSize = Math.floor(2 * radius / (imageHeight + 4 * padding));
+      summary.attr('transform', function(d, i) {
+        var x = 300 * (Math.floor(i / heightSize));
+        var y = (imageHeight + 12 * padding + textHeight) * (i % heightSize);
+        return 'translate(' + x + ',' + y + ')';
+      });
       
       summary.exit().remove();
     };
@@ -355,7 +376,6 @@
           return node;
         }).value();
       
-      console.log(blockNodes.length)
       nodes = _.union(apiNodes, blockNodes);
       force.nodes(nodes).links(links);
       
