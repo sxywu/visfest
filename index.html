@@ -10,7 +10,18 @@
       top:0;right:0;bottom:0;left:0;
       overflow-y: scroll;
     }
-    svg {
+    .graph {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 800px;
+      height: 100%;
+      background-color: rgba(255, 255, 255, .75);
+    }
+    .summaries {
+      position: fixed;
+      top: 0;
+      left: 0;
       width: 100%;
       height: 100%;
     }
@@ -35,6 +46,9 @@
     var selected = {};
     var hovered = false;
     var brushing = false;
+    var zoom = d3.behavior.zoom()
+      .size([window.innerWidth, window.innerHeight])
+      .on('zoom', panSummary);
     var force = d3.layout.force()
       .size([width, height])
       .charge(function(d) {return d.type === 'api' ? 5 : -Math.pow(d.size, 2)})
@@ -44,12 +58,16 @@
         links = [];
   
     var circle, path, text, summary;
+    var summaries = d3.select("body").append("svg")
+      .classed('summaries', true)
+        .call(zoom)
+      .append('g')
+        .attr('transform', 'translate(' +
+          (width + margin.left + margin.right) + ',0)');
     var svg = d3.select("body").append("svg")
-      .append("g")
-        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-    var summaries = d3.select('svg').append('g')
-      .attr('transform', 'translate(' +
-        (width + margin.left + margin.right) + ',' + ((height / 2) - radius) + ')');
+      .classed('graph', true).append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
     svg.append("g")
       .attr("class", "brush")
       .call(d3.svg.brush()
@@ -164,7 +182,8 @@
       var heightSize = Math.floor(2 * radius / (imageHeight + 4 * padding));
       summary.attr('transform', function(d, i) {
         var x = 300 * (Math.floor(i / heightSize));
-        var y = (imageHeight + 12 * padding + textHeight) * (i % heightSize);
+        var y = (imageHeight + 12 * padding + textHeight) * (i % heightSize) +
+          ((height / 2) - radius);
         return 'translate(' + x + ',' + y + ')';
       });
       
@@ -214,6 +233,19 @@
       calculateHighlight(null, true, 'selected');
       applyHighlight();
       renderSummary();
+    }
+
+    function panSummary() {
+      var summaryLeft = width + margin.left + margin.right;
+      var summaryRight = window.innerWidth;
+      var summaryWidth = summaries.node().getBBox().width;
+      var x = d3.event.translate[0];
+      if (x > summaryLeft) {
+        x = summaryLeft;
+      } else if (x + summaryWidth < summaryRight) {
+        x = summaryRight - summaryWidth;
+      }
+      summaries.attr('transform', 'translate(' + x + ',0)');
     }
     
     function calculateHighlight(data, highlight, type) {
