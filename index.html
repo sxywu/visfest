@@ -10,15 +10,7 @@
       top:0;right:0;bottom:0;left:0;
       overflow-y: scroll;
     }
-    .graph {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 800px;
-      height: 100%;
-      background-color: rgba(255, 255, 255, .75);
-    }
-    .summaries {
+    svg {
       position: fixed;
       top: 0;
       left: 0;
@@ -58,31 +50,32 @@
         links = [];
   
     var circle, path, text, summary;
-    var summaries = d3.select("body").append("svg")
-      .classed('summaries', true)
-        .call(zoom)
-      .append('g')
-        .attr('transform', 'translate(' +
-          (width + margin.left + margin.right) + ',0)');
-    var svg = d3.select("body").append("svg")
-      .classed('graph', true).append("g")
-      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+    var svg = d3.select("body").append("svg").append("g");
+    var summaries = svg.append('g')
+      .attr('transform', 'translate(' +
+        (width + margin.left + margin.right) + ',0)');
+    var graph = svg.append('g');
 
-    svg.append("g")
+    graph.append('rect')
+      .attr('width', width + margin.left + margin.right)
+      .attr('height', height + margin.top + margin.bottom)
+      .attr('fill', '#fff')
+      .attr('opacity', .9);
+    graph.append("g")
       .attr("class", "brush")
       .call(d3.svg.brush()
-        .x(d3.scale.identity().domain([0, width]))
-        .y(d3.scale.identity().domain([0, height]))
+        .x(d3.scale.identity().domain([(width / 2) - radius, (width / 2) + radius]))
+        .y(d3.scale.identity().domain([(height / 2) - radius, (height / 2) + radius]))
         .on('brushstart', function() {brushing = true;})
         .on("brush", brush)
         .on('brushend', function() {brushing = false;}));
     
     function enterGraph() {
-      path = svg.selectAll('line')
+      path = graph.selectAll('line')
         .data(links).enter().insert('line', '.brush')
         .attr('stroke', '#ccc')
         .attr('stroke-linecap', 'round');
-      circle = svg.selectAll('circle')
+      circle = graph.selectAll('circle')
         .data(nodes).enter().append('circle')
         .classed('node', true)
         .attr('stroke', 'none')
@@ -91,7 +84,7 @@
         .on('mouseover', hover)
         .on('mouseleave', unhover)
         .on('click', select);
-      text = svg.selectAll('text')
+      text = graph.selectAll('text')
         .data(_.filter(nodes, function(node) {return node.type === 'api';}))
         .enter().append('text')
         .classed('nodeText', true)
@@ -196,9 +189,9 @@
 
       var heightSize = Math.floor(2 * radius / (imageHeight + 4 * padding));
       summary.attr('transform', function(d, i) {
-        var x = summaryWidth * (Math.floor(i / heightSize));
-        var y = summaryHeight * (i % heightSize) + ((height / 2) - radius);
-        return 'translate(' + x + ',' + y + ')';
+        d.summaryX = summaryWidth * (Math.floor(i / heightSize));
+        d.summaryY = summaryHeight * (i % heightSize) + ((height / 2) - radius);
+        return 'translate(' + d.summaryX + ',' + d.summaryY + ')';
       }).style({
         'cursor': 'pointer'
       }).on('click', function(d) {
@@ -213,7 +206,7 @@
       if (brushing) return;
       hovered = d3.select(this).datum();
       calculateHighlight(hovered, true, 'hovered');
-      applyHighlight();
+      applyHighlight(hovered);
       renderSummary();
     }
     
@@ -227,6 +220,7 @@
     
     function select() {
       if (brushing) return;
+
       var data = d3.select(this).datum();
       if (selected[data.id]) {
         delete selected[data.id];
@@ -255,16 +249,7 @@
     }
 
     function panSummary() {
-      var summaryLeft = width + margin.left + margin.right;
-      var summaryRight = window.innerWidth;
-      var summaryWidth = summaries.node().getBBox().width;
-      var x = d3.event.translate[0];
-      if (x > summaryLeft) {
-        x = summaryLeft;
-      } else if (x + summaryWidth < summaryRight) {
-        x = summaryRight - summaryWidth;
-      }
-      summaries.attr('transform', 'translate(' + x + ',0)');
+      svg.attr('transform', 'translate(' + d3.event.translate + ')');
     }
     
     function calculateHighlight(data, highlight, type) {
@@ -317,7 +302,7 @@
       });
     }
     
-    function applyHighlight() {
+    function applyHighlight(hoveredData) {
       path.attr('stroke', function(d) {
           return d.hovered ? '#FFD84B' : '#ccc';
         }).transition().duration(brushing ? 0 : duration)
@@ -350,6 +335,11 @@
       summary && summary.select('rect')
         .attr('stroke', function(d) {
           return d.hovered ? '#FFD84B' : 'none';
+        });
+      hoveredData && selected[hoveredData.id] && summaries.transition().duration(duration * 3)
+        .attr('transform', function() {
+          var x = width + margin.left + margin.right - hoveredData.summaryX;
+          return 'translate(' + x + ',0)';
         });
     }
 
