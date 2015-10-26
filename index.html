@@ -53,7 +53,7 @@
       .on('zoom', panSummary);
     var force = d3.layout.force()
       .size([width, height])
-      .charge(function(d) {return d.type === 'api' ? 5 : -Math.pow(d.size, 2)})
+      .charge(function(d) {return d.type === 'api' ? -10 : -Math.pow(d.size, 2)})
       .linkStrength(function(d) {return d.strength})
       .on('tick', updateGraph);
 
@@ -572,13 +572,16 @@
             size: 4,
             fill: '#666'
           };
+          var totalCount = _.reduce(block.api, function(memo, count, apiName) {
+            return memo + (api[apiName] ? count : 0);
+          }, 0);
           _.each(block.api, function(count, apiName) {
             if (!api[apiName]) return;
             links.push({
               source: node,
               target: api[apiName],
               size: widthScale(count),
-              strength: strengthScale(count)
+              strength: (.75 / totalCount) * count
             });
           });
 
