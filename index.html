@@ -3,6 +3,7 @@
   <meta charset="utf-8">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/3.10.1/lodash.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/1.4.0/d3-legend.min.js"></script>
   <style>
     body {
       margin:0;
@@ -17,11 +18,19 @@
       width: 100%;
       height: 100%;
     }
+    text {
+      font-family: 'Helvetica';
+      fill: #666;
+    }
     .brush .extent {
       fill: #555;
       fill-opacity: .1;
       stroke: #fff;
       shape-rendering: crispEdges;
+    }
+
+    .hide {
+      display: none
     }
   </style>
 </head>
@@ -46,18 +55,31 @@
       .charge(function(d) {return d.type === 'api' ? 5 : -Math.pow(d.size, 2)})
       .linkStrength(function(d) {return d.strength})
       .on('tick', updateGraph);
+
+    var rawData = [];
+    var api = {};
+    var apiNodes = [];
+    var blockNodes = [];
     var nodes = [],
         links = [];
+    var sizeScale;
+    var widthScale;
+    var strengthScale;
+    var colors;
+    var totalApiSize = 0;
   
     var circle, path, text, summary;
     var svg = d3.select("body").append("svg").append("g");
+    var annotations = svg.append('g')
+      .attr('transform', 'translate(' +
+        (width + margin.left + margin.right) + ',' + (height / 2 - radius) + ')');
     var summaries = svg.append('g')
       .attr('transform', 'translate(' +
         (width + margin.left + margin.right) + ',0)');
     var graph = svg.append('g');
 
     graph.append('rect')
-      .attr('width', width + margin.left + margin.right)
+      .attr('width', width + margin.left)
       .attr('height', height + margin.top + margin.bottom)
       .attr('fill', '#fff')
       .attr('opacity', .9);
@@ -89,10 +111,8 @@
         .enter().append('text')
         .classed('nodeText', true)
         .attr('dy', '.35em')
-        .attr('fill', '#666')
         .style({
           'font-size': '12px',
-          'font-family': 'Helvetica',
           'font-weight': 600,
           'cursor': 'pointer'
         }).on('mouseover', hover)
@@ -126,12 +146,106 @@
 
       applyHighlight();
     };
+
+    function renderAnnotation() {
+      var padding = 5;
+
+      annotations.append('text')
+        .style({
+          'font-weight': 600,
+          'font-size': '28px'
+        }).text('viSFest block submissions');
+
+      var apiAnnotationSize = 10;
+      var apiAnnotation = annotations.append('g')
+        .attr('transform', function() {
+          var height = annotations.node().getBBox().height;
+          return 'translate(0,' + (height + margin.top) + ')';
+        });
+      apiAnnotation.append('circle')
+        .attr('cx', apiAnnotationSize)
+        .attr('r', apiAnnotationSize)
+        .attr('fill', colors(apiNodes[0].id))
+        .attr('opacity', .25);
+      apiAnnotation.append('text')
+        .attr('dy', '.35em')
+        .attr('transform', 'translate(' + (apiAnnotationSize * 2.5) + ',0)')
+        .html('Showing <tspan style="font-weight:600">' + apiSize +
+          '</tspan> out of ' + totalApiSize + ' functions.');
+
+      var blockAnnotation = annotations.append('g')
+        .attr('transform', function() {
+          var height = annotations.node().getBBox().height;
+          return 'translate(0,' + (height + padding) + ')';
+        });
+      blockAnnotation.append('circle')
+        .attr('cx', apiAnnotationSize)
+        .attr('r', 4)
+        .attr('fill', '#666');
+      blockAnnotation.append('text')
+        .attr('dy', '.35em')
+        .attr('transform', 'translate(' + (apiAnnotationSize * 2.5) + ',0)')
+        .html('Showing <tspan style="font-weight:600">' + blockNodes.length +
+          '</tspan> out of ' + rawData.length + ' blocks.');
+
+      var legendCircle = d3.legend.size()
+        .scale(sizeScale)
+        .shape('circle')
+        .shapePadding(5)
+        .labelOffset(20)
+        .labelFormat(d3.format('f'))
+        .orient('horizontal');
+      annotations.append('g')
+        .attr('transform', function() {
+          var height = annotations.node().getBBox().height;
+          return 'translate(0,' + (height + 2 * margin.top) + ')';
+        }).call(legendCircle)
+        .selectAll('circle')
+          .attr('fill', function(d, i) {return colors(apiNodes[i].id)})
+          .attr('opacity', .25);
+      var legendLine = d3.legend.size()
+        .scale(widthScale)
+        .shape('line')
+        .labelFormat(d3.format('f'))
+        .shapeWidth(40)
+        .labelOffset(20)
+        .labelAlign("middle")
+        .shapePadding(10)
+        .orient('horizontal');
+      annotations.append('g')
+        .attr('transform', function() {
+          var height = annotations.node().getBBox().height;
+          return 'translate(-40,' + (height + margin.top) + ')';
+        }).call(legendLine)
+        .selectAll('line')
+          .attr('stroke', '#ccc')
+          .attr('stroke-linecap', 'round')
+          .attr('stroke-opacity', .5);
+
+      annotations.append('text')
+        .attr('dy', '.35em')
+        .attr('transform', function() {
+          var height = annotations.node().getBBox().height;
+          return 'translate(0,' + (height + 2 * margin.top) + ')';
+        }).html('<tspan style="font-weight:600">Click</tspan> or ' +
+          '<tspan style="font-weight:600">brush</tspan> functions and blocks ' +
+          'to see details.')
+    };
     
     function renderSummary() {
       var selectedData = _.chain(selected)
         .filter(function(d) {return d.type !== 'api'})
         .sortBy(function(d) {return d.image})
         .value();
+
+      if (_.isEmpty(selectedData)) {
+        summaries.classed('hide', true);
+        annotations.classed('hide', false);
+      } else {
+        summaries.classed('hide', false);
+        annotations.classed('hide', true);
+      }
+
       summary = summaries.selectAll('g').data(selectedData);
       
       var enterSummary = summary.enter().append('g')
@@ -160,9 +274,7 @@
         .attr('dy', '.35em')
         .attr('transform', 'translate(' + padding + ',' + (padding + textHeight / 2) + ')')
         .style({
-          'font-weight': 600,
-          'font-family': 'Helvetica',
-          'font-size': textHeight
+          'font-weight': 600
         }).text(function(d) {
           var title = d.title;
           if (title && title.length > 30) {
@@ -183,7 +295,6 @@
         .attr('transform', 'translate(' + padding + ',' +
           (4 * padding + textHeight + imageHeight) + ')')
         .style({
-          'font-family': 'Helvetica',
           'font-size': textHeight
         }).text(function(d) {return d.user});
 
@@ -346,7 +457,8 @@
     // load data
     d3.json('data.json', function(data) {
       var linkStrengths = [];
-      var api = _.chain(data)
+      rawData = _.uniq(data, function(d) {return d.id});
+      api = _.chain(data)
         .pluck('api')
         .map(function(api) {return _.pairs(api)})
         .flatten().compact()
@@ -360,17 +472,18 @@
           return memo;
         }, {})
         .value();
-      var colors = d3.scale.category20();
-      var sizeScale = d3.scale.linear()
+      totalApiSize = _.size(api);
+      colors = d3.scale.category20();
+      sizeScale = d3.scale.linear()
         .domain([_.min(api), _.max(api)])
         .range([7.5, 35]);
-      var widthScale = d3.scale.linear()
+      widthScale = d3.scale.linear()
         .domain([_.min(linkStrengths), _.max(linkStrengths)])
         .range([1, 4]);
-      var strengthScale = d3.scale.linear()
+      strengthScale = d3.scale.linear()
         .domain([_.min(linkStrengths), _.max(linkStrengths)])
         .range([0, 1]);
-      var apiNodes = _.chain(api)
+      apiNodes = _.chain(api)
         .map(function(count, name) {
           api[name] = {
             id: name,
@@ -392,7 +505,7 @@
           node.y = radius * Math.sin(radian) + (height / 2);
           return node;
         }).compact().value();
-      var blockNodes = _.chain(data)
+      blockNodes = _.chain(data)
         .filter(function(block) {
           // only keep if it has API's and at least one of them are in apiNodes
           return !_.isEmpty(block.api) && _.some(block.api, function(count, apiName) {
@@ -427,6 +540,8 @@
       enterGraph();
       
       force.start();
+
+      renderAnnotation();
     });
   </script>
 </body>
