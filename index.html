@@ -277,8 +277,8 @@
           'font-weight': 600
         }).text(function(d) {
           var title = d.title;
-          if (title && title.length > 30) {
-            title = title.substring(0, 30) + ' ...';
+          if (title && title.length > 25) {
+            title = title.substring(0, 25) + ' ...';
           }
           return title;
         });
