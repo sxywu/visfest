@@ -285,7 +285,7 @@
       
       summary.select('image')
         .attr('xlink:href', function(d) {
-          return d.image
+          return d.image || 'visfest4.png';
         }).attr('width', imageWidth)
         .attr('height', imageHeight)
         .attr('transform', 'translate(' + padding + ',' + (textHeight + 2 * padding) + ')');
