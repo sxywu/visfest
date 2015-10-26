@@ -83,8 +83,8 @@
       .style({
         'position': 'fixed',
         'top': 0,
-        'right': 0,
-        'margin': '10px',
+        'left': width + margin.left + margin.right + 'px',
+        'margin': '10px 10px 10px 0',
         'width': '300px'
       });
     var searchbar = div.append('input')
@@ -95,7 +95,8 @@
     var numMatches = div.append('label')
       .style({
         'text-align': 'right',
-        'color': '#666'
+        'color': '#666',
+        'margin': '5px'
       });
 
     graph.append('rect')
