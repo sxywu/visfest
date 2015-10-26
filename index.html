@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <head>
   <meta charset="utf-8">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/3.10.1/lodash.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/1.4.0/d3-legend.min.js"></script>
@@ -77,6 +78,25 @@
       .attr('transform', 'translate(' +
         (width + margin.left + margin.right) + ',0)');
     var graph = svg.append('g');
+
+    var div = d3.select('body').append('div')
+      .style({
+        'position': 'fixed',
+        'top': 0,
+        'right': 0,
+        'margin': '10px',
+        'width': '300px'
+      });
+    var searchbar = div.append('input')
+      .classed({"form-control": true})
+      .attr('type', 'text')
+      .attr('placeholder', 'search by github username')
+      .on('keyup', searchUsername);
+    var numMatches = div.append('label')
+      .style({
+        'text-align': 'right',
+        'color': '#666'
+      });
 
     graph.append('rect')
       .attr('width', width + margin.left)
@@ -361,6 +381,36 @@
 
     function panSummary() {
       svg.attr('transform', 'translate(' + d3.event.translate + ')');
+    }
+
+    function searchUsername(e) {
+      var chara = d3.event.keyCode;
+      var value = d3.event.target.value;
+      if (chara === 13) {
+        selected = {};
+        var block = _.chain(blockNodes)
+          .filter(function(block) {
+            return value && block.user.match(value);
+          }).each(function(block) {
+            selected[block.id] = block;
+          }).value();
+        calculateHighlight(null, true, 'selected');
+        applyHighlight();
+        renderSummary();
+      } else if (chara === 27) {
+        selected = {};
+        calculateHighlight(null, true, 'selected');
+        applyHighlight();
+        renderSummary();
+
+        value = d3.event.target.value = null;
+        d3.event.target.blur();
+      }
+      var matched = _.filter(blockNodes, function(block) {
+        return value && block.user.match(value);
+      });
+      var matchedText = value ? (matched.length + ' matches') : '';
+      numMatches.text(matchedText);
     }
     
     function calculateHighlight(data, highlight, type) {
