@@ -75,8 +75,7 @@
       .attr('transform', 'translate(' +
         (width + margin.left + margin.right) + ',' + (height / 2 - radius) + ')');
     var summaries = svg.append('g')
-      .attr('transform', 'translate(' +
-        (width + margin.left + margin.right) + ',0)');
+      .attr('transform', 'translate(' + (width + margin.left + margin.right) + ',0)');
     var graph = svg.append('g');
 
     var div = d3.select('body').append('div')
