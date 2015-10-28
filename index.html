@@ -103,14 +103,17 @@
       .attr('height', height + margin.top + margin.bottom)
       .attr('fill', '#fff')
       .attr('opacity', .9);
+    var svgBrush = d3.svg.brush()
+      .x(d3.scale.identity().domain([(width / 2) - radius, (width / 2) + radius]))
+      .y(d3.scale.identity().domain([(height / 2) - radius, (height / 2) + radius]))
+      .on('brushstart', function() {
+        summaries.attr('transform', 'translate(' + (width + margin.left + margin.right) + ',0)');
+        brushing = true;
+      }).on("brush", brush)
+      .on('brushend', function() {brushing = false;});
     graph.append("g")
       .attr("class", "brush")
-      .call(d3.svg.brush()
-        .x(d3.scale.identity().domain([(width / 2) - radius, (width / 2) + radius]))
-        .y(d3.scale.identity().domain([(height / 2) - radius, (height / 2) + radius]))
-        .on('brushstart', function() {brushing = true;})
-        .on("brush", brush)
-        .on('brushend', function() {brushing = false;}));
+      .call(svgBrush);
     
     function enterGraph() {
       path = graph.selectAll('line')
@@ -390,6 +393,7 @@
       var value = d3.event.target.value;
       if (chara === 13) {
         selected = {};
+        svgBrush.empty();
         var block = _.chain(blockNodes)
           .filter(function(block) {
             return value && block.user.match(value);
