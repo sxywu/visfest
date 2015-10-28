@@ -45,6 +45,7 @@
     var radius = 250;
     var apiSize = 50;
     var ignoreApi = ['d3.select', 'd3.selectAll'];
+    var selectedBlocks = {};
     var selected = {};
     var hovered = false;
     var brushing = false;
@@ -259,7 +260,8 @@
     };
     
     function renderSummary() {
-      var selectedData = _.chain(selected)
+      var selectedData = _.chain(selected).values()
+        .union(_.values(selectedBlocks))
         .filter(function(d) {return d.type !== 'api'})
         .sortBy(function(d) {return d.image})
         .value();
@@ -371,6 +373,7 @@
     
     function brush() {
       selected = {};
+      selectedBlocks = {};
       var extent = d3.event.target.extent();
       circle.each(function(d) {
         if (d.type !== 'api' &&
@@ -394,6 +397,7 @@
       var value = d3.event.target.value;
       if (chara === 13) {
         selected = {};
+        selectedBlocks = {};
         svgBrush.empty();
         var block = _.chain(blockNodes)
           .filter(function(block) {
@@ -406,6 +410,7 @@
         renderSummary();
       } else if (chara === 27) {
         selected = {};
+        selectedBlocks = {};
         calculateHighlight(null, true, 'selected');
         applyHighlight();
         renderSummary();
@@ -422,6 +427,7 @@
     
     function calculateHighlight(data, highlight, type) {
       var nodesToHighlight = {};
+      selectedBlocks = {};
 
       path.each(function(d) {
         d.selected = false;
@@ -462,6 +468,9 @@
         if (nodesToHighlight[d.id]) {
           // if on other side of a node being hovered or selected
           d[nodesToHighlight[d.id]] = true;
+          if (d.type !== 'api' && d.selected && !d.hovered) {
+            selectedBlocks[d.id] = d;
+          }
         }
         if (highlight && data && d.id === data.id) {
           // if circle is being hovered or selected
@@ -504,11 +513,16 @@
         .attr('stroke', function(d) {
           return d.hovered ? '#FFD84B' : 'none';
         });
-      hoveredData && selected[hoveredData.id] && summaries.transition().duration(duration * 3)
-        .attr('transform', function() {
-          var x = width + margin.left + margin.right - hoveredData.summaryX;
-          return 'translate(' + x + ',0)';
-        });
+
+      if (hoveredData && hoveredData.type !== 'api' &&
+        (selected[hoveredData.id] || selectedBlocks[hoveredData.id])) {
+        summaries.transition().duration(duration * 3)
+          .attr('transform', function() {
+            var x = width + margin.left + margin.right - hoveredData.summaryX;
+            return 'translate(' + x + ',0)';
+          });
+        }
+        
     }
 
     // load data
