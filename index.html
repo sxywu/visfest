@@ -255,7 +255,8 @@
           '<tspan x=0 dy="1.2em">linked to and placed closest to the d3 functions</tspan>' +
           '<tspan x=0 dy="1.2em">they most often use.</tspan>' +
           '<tspan x=0 dy="2.4em"><tspan style="font-weight:600">Click</tspan> or ' +
-          '<tspan style="font-weight:600">brush</tspan> functions and blocks to see details.</tspan>');
+          '<tspan style="font-weight:600">brush</tspan> blocks to see details.</tspan>' +
+          '<tspan x=0 dy="2.4em" style="font-size:12px;color:#ccc;">(Best viewed on desktop with a resolution of 1280x960 or above)');
     };
     
     function renderSummary() {
@@ -265,7 +266,8 @@
         .value();
 
       if (_.isEmpty(selectedData)) {
-        summaries.classed('hide', true);
+        summaries.classed('hide', true)
+          .attr('transform', 'translate(' + (width + margin.left + margin.right) + ',0)');
         annotations.classed('hide', false);
       } else {
         summaries.classed('hide', false);
