@@ -422,7 +422,6 @@
     
     function calculateHighlight(data, highlight, type) {
       var nodesToHighlight = {};
-      var nodesToCorrelate = {};
 
       path.each(function(d) {
         d.selected = false;
@@ -453,24 +452,9 @@
         }
       });
 
-      if (data && data.type === 'api') {
-        // if user hovered api function, calculate correlating api functions
-        _.each(nodesToHighlight, function(type, nodeName) {
-          var node = blocks[nodeName];
-          if (node.type !== 'api') {
-            _.each(node.api, function(count, apiName) {
-              if (api[apiName]) {
-                nodesToCorrelate[apiName] = api[apiName];
-              }
-            });
-          }
-        });
-      }
-
       d3.selectAll('.node,.nodeText,.summary').each(function(d) {
         d.selected = false;
         d.hovered = false;
-        d.correlated = false;
         if (selected[d.id]) {
           // if previously selected
           d.selected = true;
@@ -478,9 +462,6 @@
         if (nodesToHighlight[d.id]) {
           // if on other side of a node being hovered or selected
           d[nodesToHighlight[d.id]] = true;
-        }
-        if (nodesToCorrelate[d.id]) {
-          d.correlated = true;
         }
         if (highlight && data && d.id === data.id) {
           // if circle is being hovered or selected
@@ -503,15 +484,10 @@
           }
         });
       circle.attr('stroke', function(d) {
-          if (d.hovered) {
-            return '#FFD84B';
-          } else if (d.correlated) {
-            return '#95CBE7';
-          }
-          return 'none';
+          return d.hovered ? '#FFD84B' : 'none';
         }).transition().duration(brushing ? 0 : duration)
         .attr('fill-opacity', function(d) {
-          if (d.selected || d.hovered || d.correlated) {
+          if (d.selected || d.hovered) {
             return d.type === 'api' ? .5 : 1;
           } else if (_.isEmpty(selected) && !hovered) {
             return d.type === 'api' ? .25 : 1;
@@ -521,7 +497,7 @@
         });
       text.transition().duration(brushing ? 0 : duration)
         .attr('fill-opacity', function(d) {
-          return d.selected || d.hovered || d.correlated ||
+          return d.selected || d.hovered ||
             (_.isEmpty(selected) && !hovered) ? 1 : .15;
         });
       summary && summary.select('rect')
