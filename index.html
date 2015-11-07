@@ -39,7 +39,7 @@
 <body>
   <script>
     var margin = {top: 20, right: 10, bottom: 20, left: 10};
-    var width = 800 - margin.left - margin.right;
+    var width = 700 - margin.left - margin.right;
     var height = 800 - margin.top - margin.bottom;
     var duration = 100;
     var radius = 250;
@@ -52,7 +52,7 @@
       .size([window.innerWidth, window.innerHeight])
       .on('zoom', panSummary);
     var force = d3.layout.force()
-      .size([width, height])
+      .size([850, height])
       .charge(function(d) {return d.type === 'api' ? -10 : -Math.pow(d.size, 2)})
       .linkStrength(function(d) {return d.strength})
       .on('tick', updateGraph);
@@ -70,19 +70,19 @@
     var totalApiSize = 0;
   
     var circle, path, text, summary;
-    var svg = d3.select("body").append("svg").append("g");
+    var svg = d3.select("body").append("svg").append("g")
+      .attr('transform', 'scale(.85)');
     var annotations = svg.append('g')
-      .attr('transform', 'translate(' +
-        (width + margin.left + margin.right) + ',' + (height / 2 - radius) + ')');
+      .attr('transform', 'translate(' + width + ',' + (height / 2 - radius) + ')');
     var summaries = svg.append('g')
-      .attr('transform', 'translate(' + (width + margin.left + margin.right) + ',0)');
+      .attr('transform', 'translate(' + width + ',0)');
     var graph = svg.append('g');
 
     var div = d3.select('body').append('div')
       .style({
         'position': 'fixed',
         'top': 0,
-        'left': width + margin.left + margin.right + 'px',
+        'left': '580px',
         'margin': '10px 10px 10px 0',
         'width': '300px'
       });
@@ -99,7 +99,7 @@
       });
 
     graph.append('rect')
-      .attr('width', width + margin.left)
+      .attr('width', width)
       .attr('height', height + margin.top + margin.bottom)
       .attr('fill', '#fff')
       .attr('opacity', .9);
